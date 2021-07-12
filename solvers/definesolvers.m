@@ -105,6 +105,19 @@ i = 1;
 % DEFINE SOLVERS
 % ****************************
 
+solver(i)                    = lpsolver;
+solver(i).tag                = 'COPT';
+solver(i).version            = 'COPTMEX';
+solver(i).checkfor           = {'copt_solve'};
+solver(i).call               = 'callcopt';
+solver(i).constraint.integer = 1;
+solver(i).constraint.binary  = 1;
+solver(i).constraint.sos1    = 1;
+solver(i).constraint.sos2    = 1;
+solver(i).supportsinitial    = 1;
+solver(i).supportsinitialNAN = 1;
+i = i + 1;
+
 solver(i) = qpsolver;
 solver(i).tag     = 'GUROBI';
 solver(i).version = 'GUROBI';
