@@ -14,7 +14,7 @@ solution   = copt_solve(problem, problem.params);
 solvertime = toc(solvertime);
 
 if isfield(solution, 'x')
-    x = solution.x;
+    x = solution.x(1:numvars);
 else
     x = zeros(numvars, 1);
 end

@@ -2,7 +2,7 @@ function model = yalmip2copt(interfacedata)
 
 F_struc            = interfacedata.F_struc;
 K                  = interfacedata.K;
-% Q                = interfacedata.Q;
+Q                  = interfacedata.Q;
 c                  = interfacedata.c;
 lb                 = interfacedata.lb;
 ub                 = interfacedata.ub;
@@ -25,23 +25,27 @@ if ~isempty(ub)
     end
 else
     LB = -inf(n, 1);
-    UB = inf(n, 1);
+    UB = +inf(n, 1);
 end
 
 if ~isempty(semicont_variables)
-    warning('WARNING: Semi-continuous or semi-integer variables not supported.');
+    warning('WARNING: Semi-continuous or semi-integer variables are not supported.');
 end
 
 if size(F_struc, 1) > 0
-    B = full(F_struc(:, 1));
-    A = -F_struc;
-    A(:, 1) = [];
+    A   = -F_struc(:, 2:end);
+    RHS = full(F_struc(:, 1));
+    LHS = -inf(length(RHS), 1);
 else
-    B = [];
-    A = [];
+    A   = sparse(ones(1, length(c)));
+    RHS = +inf(length(c), 1);
+    LHS = -inf(length(c), 1);
 end
 
-CTYPE   = char([ones(K.f, 1) * 69; ones(K.l, 1) * 76]);
+if K.f > 0
+    LHS(1:K.f) = RHS(1:K.f);
+end
+
 VARTYPE = char(ones(length(c), 1) * 67);
 if isempty(semicont_variables)
     VARTYPE(integer_variables) = 'I';
@@ -64,10 +68,27 @@ model.obj   = full(c);
 model.lb    = LB;
 model.ub    = UB;
 model.vtype = VARTYPE;
-% model.varnames = {};
-model.sense = CTYPE;
-model.rhs   = full(B);
-% model.constrnames = {};
+model.lhs   = LHS;
+model.rhs   = RHS;
+
+if K.q(1) > 0
+    nconevar = sum(K.q);
+    top = size(F_struc, 2) - 1;
+
+    model.A     = [model.A, [spalloc(K.f + K.l, nconevar, 0); speye(nconevar)]];
+    model.obj   = [model.obj; zeros(nconevar, 1)];
+    model.lb    = [model.lb; -inf(nconevar, 1)];
+    model.ub    = [model.ub; +inf(nconevar, 1)];
+    model.vtype = [model.vtype; char(ones(nconevar, 1) * 67)];
+
+    model.lhs(1 + K.f + K.l:end) = model.rhs(1 + K.f + K.l:end);
+
+    for i = 1:length(K.q)
+        model.cone(i).type = 1;
+        model.cone(i).vars = top + 1:top + K.q(i);
+        top = top + K.q(i);
+    end
+end
 
 if ~isempty(K.sos.type)
     for i = 1:length(K.sos.type)
