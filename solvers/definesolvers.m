@@ -123,6 +123,16 @@ solver(i).supportsinitial = 1;
 solver(i).supportsinitialNAN = 1;
 i = i + 1;
 
+solver(i) = sdpsolver;
+solver(i).tag = 'COPT';
+solver(i).version = 'COPTMEX';
+solver(i).checkfor = {'copt_solve'};
+solver(i).call = 'callcopt';
+solver(i).constraint.equalities.linear = 1;
+solver(i).constraint.inequalities.secondordercone.linear = 1;
+solver(i).constraint.inequalities.rotatedsecondordercone.linear = 1;
+i = i + 1;
+
 solver(i) = qpsolver;
 solver(i).tag     = 'GUROBI';
 solver(i).version = 'GUROBI';

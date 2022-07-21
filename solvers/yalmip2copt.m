@@ -2,7 +2,6 @@ function model = yalmip2copt(interfacedata)
 
 F_struc            = interfacedata.F_struc;
 K                  = interfacedata.K;
-Q                  = interfacedata.Q;
 c                  = interfacedata.c;
 lb                 = interfacedata.lb;
 ub                 = interfacedata.ub;
@@ -11,6 +10,63 @@ integer_variables  = interfacedata.integer_variables;
 binary_variables   = interfacedata.binary_variables;
 semicont_variables = interfacedata.semicont_variables;
 n                  = length(c);
+
+if ~isempty(K.s) && any(K.s)
+    if ~isempty(integer_variables) || ~isempty(binary_variables) || ~isempty(semicont_variables)
+        warning('WARNING: Unsupported problem types for COPT');
+    end
+
+    if ~isempty(ub)
+        [F_struc, K] = addStructureBounds(F_struc, K, ub, lb);
+    end
+
+    data.A = -F_struc(:, 2:end);
+    data.b = full(F_struc(:, 1));
+    data.c = full(c);
+
+    dims = [];
+    dims.f = K.f;
+    dims.l = K.l;
+    dims.q = K.q;
+    dims.r = K.r;
+    dims.s = K.s;
+
+    sdpA = data.A(1 + K.f + K.l + sum(K.q) + sum(K.r):end, :);
+    sdpb = data.b(1 + K.f + K.l + sum(K.q) + sum(K.r):end, :);
+    data.A = data.A(1:K.f + K.l + sum(K.q) + sum(K.r), :);
+    data.b = data.b(1:K.f + K.l + sum(K.q) + sum(K.r), :);
+
+    top = 1;
+    for i = 1:length(K.s)
+        A = sdpA(top:top + K.s(i)^2 - 1, :);
+        b = sdpb(top:top + K.s(i)^2 - 1, :);
+        n = K.s(i);
+        ind = find(tril(ones(n)));
+        A = A(ind, :);
+        b = b(ind);
+        data.A = [data.A; A];
+        data.b = [data.b; b];
+        top = top + K.s(i)^2;
+    end
+
+    conedata.A = data.A';
+    conedata.c = -data.b;
+    conedata.b = -data.c;
+    conedata.K = dims;
+    conedata.objsen = 'max';
+    model.conedata = conedata;
+
+    interfacedata.options = pruneOptions(interfacedata.options);
+
+    model.params = interfacedata.options.copt;
+    if interfacedata.options.verbose == 0
+        model.params.Logging = 0;
+    else
+        model.params.Logging = 1;
+    end
+
+    return
+end
 
 if ~isempty(ub)
     LB = lb;

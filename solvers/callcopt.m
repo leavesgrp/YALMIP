@@ -1,7 +1,6 @@
 function output = callcopt(interfacedata)
 
 options = interfacedata.options;
-numvars = length(interfacedata.c);
 problem = yalmip2copt(interfacedata);
 
 if interfacedata.options.savedebug
@@ -13,17 +12,71 @@ solvertime = tic;
 solution   = copt_solve(problem, problem.params);
 solvertime = toc(solvertime);
 
-if isfield(solution, 'x')
-    x = solution.x(1:numvars);
-else
-    x = zeros(numvars, 1);
-end
+if isfield(solution, 'rowmap')
+    nrow = length(solution.rowmap);
+    x = zeros(nrow, 1);
+    if isfield(solution, 'psdpi')
+        for i = 1:nrow
+            if solution.rowmap(i) < 0
+                x(i) = -solution.psdpi(-solution.rowmap(i));
+            else
+                x(i) = -solution.pi(solution.rowmap(i));
+            end
+        end
+    end
 
-if isfield(solution, 'pi')
-    % Do we have reversed sign-convention?
-    D_struc = -solution.pi;
+    if isfield(solution, 'psdx')
+        if isfield(solution, 'x')
+            y = [solution.x; solution.psdx];
+        else
+            y = solution.psdx;
+        end
+
+        dims = problem.conedata.K;
+
+        D_struc = y(1:dims.f + dims.l + sum(dims.q) + sum(dims.r));
+        if isfield(solution, 'psdx')
+            top = 1 + dims.f + dims.l + sum(dims.q) + sum(dims.r);
+            for i = 1:length(dims.s)
+                n = dims.s(i);
+                sdpdual = y(top:top + n * (n + 1) / 2 - 1);
+                Z = zeros(n);
+                ind = find(tril(ones(n)));
+                Z(ind) = sdpdual;
+                Z = Z + Z';
+                ind = find(speye(n));
+                Z(ind) = Z(ind) / 2.0;
+                D_struc = [D_struc; Z(:)];
+                top = top + n * (n + 1) / 2;
+            end
+        end
+    else
+        D_struc = [];
+    end
+
+    dualstatus = solution.status;
+    switch dualstatus
+        case 'infeasible'
+            solution.status = 'unbounded';
+        case 'unbounded'
+            solution.status = 'infeasible';
+        otherwise
+            solution.status = dualstatus;
+    end
 else
-    D_struc = [];
+    numvars = length(interfacedata.c);
+
+    if isfield(solution, 'x')
+        x = solution.x(1:numvars);
+    else
+        x = zeros(numvars, 1);
+    end
+
+    if isfield(solution, 'pi')
+        D_struc = -solution.pi;
+    else
+        D_struc = [];
+    end
 end
 
 switch solution.status
