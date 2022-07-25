@@ -662,6 +662,7 @@ copt.Presolve          = -1;
 copt.Scaling           = -1;
 copt.Dualize           = -1;
 copt.LpMethod          = -1;
+copt.ReqFarkasRay      = 0;
 copt.DualPrice         = -1;
 copt.DualPerturb       = -1;
 copt.CutLevel          = -1;
